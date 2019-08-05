@@ -26,7 +26,7 @@ static void on_arrow_key_released(int key, int x, int y);
 
 //****PARAMETRI ANIMACIJE*****//
 
-static int animation_ongoing = 0;
+int animation_ongoing = 0;
 
 int RightKeyPressed = 0;
 int LeftKeyPressed = 0;
@@ -39,17 +39,19 @@ int faktor = 0;
 
 float x_trans = 0;
 
+
 /*promenljive koje sluzae za trnaslaciju dve ploce staze
  *azuriraju se u on_timer f-ji pre iscratavanje novog frejma
  *koriste se u f-ji draw_path() (koja se nalazi u fajlu ET2_f.c) kao
  *parametri u f-ji translacije kako bi se napravila animacija kretanja staze
  */
 float path_trans_1 = 0;
-float path_trans_2 = -1.04;
+float path_trans_2 = -1;
 
-
-
+gsl_matrix_view i; //INVERZ MATRICE POGLEDA (V^-1)
 //******************//
+
+
 
 
 
@@ -75,7 +77,8 @@ int main(int argc, char *argv[])
 	//boja za ciscenje prozora
 	glClearColor(0, 0, 0, 0);
 	glEnable(GL_DEPTH_TEST);
-
+	glEnable(GL_NORMALIZE);
+	
 	//glavna petlja
 	glutMainLoop();
 
@@ -261,8 +264,8 @@ static void on_timer(int value){
      *odnosno ne ubrazava se kretanje staze kada je igra u toku
      */
     if(value != 1){
-		path_trans_1 += 0.009;
-		path_trans_2 += 0.009;
+		path_trans_1 += 0.002;
+		path_trans_2 += 0.002;
 	}
 
 
@@ -272,7 +275,7 @@ static void on_timer(int value){
 
     /* Po potrebi se ponovo postavlja tajmer. */
     if (animation_ongoing)
-        glutTimerFunc(25, on_timer, TIMER0);
+        glutTimerFunc(1, on_timer, TIMER0);
 }
 /*--------------------------------------------------------------*/
 //pozva se kad se promeni razmera prozora
@@ -314,8 +317,9 @@ static void on_display(void){
 	 *ponistavanje kretnji kamere se desava pritiskom na taster 'r'
 	 */
 
-	//glMatrixMode(GL_MODELVIEW);
-	//glLoadIdentity();
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+	
 	gluLookAt(0 +  faktor*(ro*cos(sigma)*sin(fi)), //x 
 			  1 +  faktor*(ro*sin(sigma)*sin(fi)), //y 
 			  4 +  faktor*(ro*cos(fi)),            //z 
@@ -325,23 +329,28 @@ static void on_display(void){
 	
 	
 
+	//PAMTIMO INVERZ MATRICE V (MATRICE POGLEDA) NA SAMOM POCETKU
+	//KAKO BI GA PONISTILI U MODELVIEW (MV) MATRICI MNOZENJEM MATRICA
+	// MV * V^(-1) = M 
+	save_V_inverse();
+
+
+
+
 	set_lights(); //pozivamo f-je za postavljanje osvetljenja i materijala
 	
 	draw_axes(); //pozivamo f-ju za iscrtavanje koordinatnih osa
-
-	
-	draw_path(); //pozivamo f-ju za iscrtavanje staze
 
 
 	/* x_trans je parametar koji se menja pritiskom 
 	 * tastera '<-' ili '->'. Sluzi za pomeranje igraca levo-desno.
 	 * Prosledjuje se f-ji za iscrtavanja igraca kako bi se uz
 	 * pomoc translacije za zadatu vrednost parametra igrac iscrtao na
-	 * odgovarajucoj poziciji (videti f-ju draw_player)
+	 * odgovarajucoj poziciji (videti f-ju draw_player, fajl ET2_f.c)
 	 */
 	draw_player(x_trans); //pozivamo f-ju za iscrtavanje igraca
 
-	
+	draw_path(); //pozivamo f-ju za iscrtavanje staze
 
 
 	//zamenjujemo sadrzaje buffera

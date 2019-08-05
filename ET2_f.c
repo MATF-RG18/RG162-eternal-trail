@@ -5,16 +5,16 @@
 #include "ET2.h"
 
 //** GLOABLNI NIZVOVI ZA MATERIJALE **//
-//** vrednosti ovih nizova se postavljaju pre iscrtavanja objekata **//
+//** postavljamo vrednosti ovih nizova pre iscrtavanja objekata **//
 GLfloat ambient_coeffs[4];
 GLfloat diffuse_coeffs[4];
 GLfloat specular_coeffs[4];
 GLfloat shininess;
 /***************************/
 
+
 extern float path_trans_1;
 extern float path_trans_2;
-
 
 /*granicnik za transalciju ploca staze (videti f-ju draw_path())
  *vrednost granicnika je zadata eksperimentalno, tako da igrac
@@ -22,7 +22,37 @@ extern float path_trans_2;
  */
 float ghost_border = 1.5;
 
+//redni brojevi sablona prepreka
+int pattern_1 = 1;
+int pattern_2 = 1;
 
+/************KOLIZIJE*****************/
+extern float x_trans;
+extern int animation_ongoing;
+
+
+float i_X_l; 
+float i_X_d;
+float i_z_front_tolerance = -0.6;
+float i_z_back_tolerance  =  0.0;
+
+float k_z; 
+float k_X_l; 
+float k_X_d;
+
+extern gsl_matrix_view i;
+
+
+
+/*koriste se u f-ji  save_V_invert()
+ *IZ NEKOG NEPOZNATOG RAZLOGA MORAJU BITI DEFINISANO GLOBALNO
+ *kada su definisani globalno ujeno se i njihovi el.
+ *inicijalizuju na 0
+ */
+double rez[16];
+double inv[16];
+
+/*****************************/
 
 
 void draw_axes(){
@@ -96,10 +126,49 @@ void draw_player(float x_trans){
 		//GLfloat material_emission[] = {0.3, 0.2, 0.2, 0.0};
 		//glMaterialfv(GL_FRONT, GL_EMISSION, material_emission);
 
-			
+		
+
+
 		glTranslatef(x_trans, 0.3, 0);
 		//glScalef(0.4, 0.4, 0.4);
 		glutSolidSphere(0.3, 100, 100);
+
+
+
+
+		printf("*************************\n");
+		double sfrea_mv[16];
+		glGetDoublev(GL_MODELVIEW_MATRIX, sfrea_mv);
+		gsl_matrix_view s = gsl_matrix_view_array(sfrea_mv, 4, 4);
+
+		double c[] = { 	0.00, 0.00, 0.00, 0.00,
+					0.00, 0.00, 0.00, 0.00,
+					0.00, 0.00, 0.00, 0.00,
+					0.00, 0.00, 0.00, 0.00
+				};
+
+
+		gsl_matrix_view C = gsl_matrix_view_array(c, 4, 4);
+
+		gsl_blas_dgemm(	CblasNoTrans, CblasNoTrans,
+					1.0, &s.matrix, &i.matrix,
+					0.0, &C.matrix
+				);
+
+		i_X_d =  gsl_matrix_get(&C.matrix, 3, 0) + 0.3*gsl_matrix_get(&C.matrix, 0, 0);
+		i_X_l =  gsl_matrix_get(&C.matrix, 3, 0) - 0.3*gsl_matrix_get(&C.matrix, 0, 0);
+
+		/*
+		for(int k = 0; k<4; k++){
+
+			for(int j = 0; j<4; j++)
+				printf("%lf ", gsl_matrix_get(&C.matrix, k, j) );
+			printf("\n");
+		}
+		
+		printf("\n");
+		*/
+
 
 	glPopMatrix(); 
 }
@@ -117,6 +186,9 @@ void draw_path(){
 	    glMaterialfv(GL_FRONT, GL_SPECULAR, specular_coeffs);
 	    glMaterialf(GL_FRONT, GL_SHININESS, shininess);
 
+		
+
+
 
 	    /*ukoliko neka od plca staze prodje zadatu granicu
 	     *nadovezuje se na kraj ove druge 
@@ -127,25 +199,105 @@ void draw_path(){
 	     *kako bi se u narednom frejmu ploca koja je dostigla granicu nadovezala 
 	     *na kraj druge ploce
 	     */
+	    //TODO: 
+	    //random izvlacenje narednog sablona za ravan ide u ovom delu
 		if(path_trans_1 >= ghost_border)
-			path_trans_1 = -1.04+path_trans_2;
+			path_trans_1 = -1+path_trans_2;
 
 		if(path_trans_2 >= ghost_border)
-			path_trans_2 = -1.04+path_trans_1;
+			path_trans_2 = -1+path_trans_1;
+
+
+		
+	    //NE DIRATI REDOSLED OVIH TRANSOFRAMCIJA!!!
+	    //mora prvo da ide skaliranje pa translacija
+	    //kako bi uvek translirari za isti vektor,
+	    //bez obzira na skaliranje
 		
 
+		//UNDO: 100 -> 10 u glScalef
 		glPushMatrix();
 
-			//1. PLOCA STAZE
+			//1. PLOCA STAZES
 			glScalef(4, 0.125, 100);
 			glTranslatef(0, -0.5, -0.5 + path_trans_1);
 			glutSolidCube(1);
+
+
+			
 
 			//kockica na sredini
 			glScalef(1.0/4, 1.0/0.125, 1.0/100);
 			glTranslatef(0, 0.5, 0);
 			glutSolidCube(1);			
-					
+
+			
+			/************************/
+
+			k_z = get_z();
+			
+			k_X_l = get_x_left();
+			k_X_d =	get_x_right();
+
+			printf("%f\n", k_z );
+			printf("%f %f\n", k_X_l, k_X_d);
+
+			printf("%f %f\n", i_X_l, i_X_d );
+
+
+			/************************/
+
+			if(k_X_l <= i_X_l && k_X_d >= i_X_d)
+				printf("true ");
+			else
+				printf("false ");
+
+			if(k_z >= i_z_front_tolerance && k_z < i_z_back_tolerance)
+				printf("true\n");
+			else
+				printf("false\n");
+			
+
+			if( (k_z >= i_z_front_tolerance && k_z < i_z_back_tolerance) && 
+									(k_X_l <= i_X_l && k_X_d >= i_X_d) )
+			{
+				animation_ongoing = 0;
+				printf("SUDAR!\n");
+				
+			}
+
+			/******************************/
+
+
+			if(pattern_1 == 1){
+
+				glPushMatrix();
+					glScalef(0.6, 4.5, 1);
+					glTranslatef(1.8, 0.4, -40);
+					glutSolidCube(1);
+					glTranslatef(-3.6, 0, 0);
+					glutSolidCube(1);
+				glPopMatrix();
+
+				
+				glPushMatrix();
+					glScalef(1.3, 1.5, 0.3);
+					glTranslatef(0.9, 0.2, 150);
+					glutSolidCube(1);
+					glTranslatef(-1.8, 0, 0);
+					glutSolidCube(1);
+				glPopMatrix();
+
+			}		
+
+			if(pattern_1 == 2){
+
+			}
+
+			if(pattern_1 == 3){
+
+			}
+
 
 		glPopMatrix();
 		
@@ -164,9 +316,170 @@ void draw_path(){
 			glTranslatef(0, 0.5, 0);
 			glutSolidCube(1);
 
+
+
+			if(pattern_1 == 1){	
+
+				glPushMatrix();
+					glScalef(2.55, 1.5, 0.3);
+					glTranslatef(-0.25, 0.15, -100);
+					glutSolidCube(1);
+				glPopMatrix();
+
+
+				glPushMatrix();
+					glScalef(0.8, 2.8, 0.9);
+					glTranslatef(-1.5, 0.2, 50);
+					glutSolidCube(1);
+					glTranslatef(1.3, 0, 0);
+					glutSolidCube(1);
+				glPopMatrix();
+
+			}		
+
+			if(pattern_1 == 2){
+
+			}
+
+			if(pattern_1 == 3){
+
+			}
+
+
 		glPopMatrix();
 		
+
+		//NOTE: 
+		/* NAKON IZVEDENIH TRANSFORAMCIJA
+		 * CEO PROSTOR JE TRNASFORMISAN
+		 * T.D. TO UTICE I NA SVE OSTALE TRANSFORMACIJE
+		 *
+         */
+
+		
+
+
+
+
+		//ako hocemo razmak izmedju ravni mrdnemo se za
+		//vise od 1 npr za 1.1 so ce napraviti razmak
+		//sirine 1 izmedju 1. ravni i 2. ravni		
+		
+		
+		//printf("p1: %f  p2: %f\n", p1.begining, p2.begining);
 		
 
 	glPopMatrix();
+}
+
+void save_V_inverse(){
+
+
+	glGetDoublev(GL_MODELVIEW_MATRIX, rez);
+
+	gsl_matrix_view m = gsl_matrix_view_array(rez, 4, 4);
+
+	i = gsl_matrix_view_array(inv, 4, 4);
+
+	gsl_permutation* p = gsl_permutation_alloc(4);
+	int s;
+
+
+	gsl_linalg_LU_decomp(&m.matrix, p, &s);
+	gsl_linalg_LU_invert(&m.matrix, p, &i.matrix);
+
+}
+
+double get_z(){
+
+	double MV[16];
+
+	glGetDoublev(GL_MODELVIEW_MATRIX, MV);
+
+	gsl_matrix_view mv = gsl_matrix_view_array(MV, 4, 4);
+
+
+	double zeroes[] = { 	0.00, 0.00, 0.00, 0.00,
+							0.00, 0.00, 0.00, 0.00,
+							0.00, 0.00, 0.00, 0.00,
+							0.00, 0.00, 0.00, 0.00
+					  };
+
+
+	gsl_matrix_view C = gsl_matrix_view_array(zeroes, 4, 4);
+
+	gsl_blas_dgemm(	CblasNoTrans, CblasNoTrans,
+					1.0, &mv.matrix, &i.matrix,
+					0.0, &C.matrix
+				);
+	/*
+	for(int i = 0; i<4; i++){
+
+		for(int j = 0; j<4; j++)
+			printf("%lf ", gsl_matrix_get(&C.matrix, i, j) );
+		printf("\n");
+	}
+	*/
+
+
+	return gsl_matrix_get(&C.matrix, 3, 2) + 1*gsl_matrix_get(&C.matrix, 2, 2)/2.0;
+
+
+
+}
+
+double get_x_right(){
+
+	double MV[16];
+
+	glGetDoublev(GL_MODELVIEW_MATRIX, MV);
+
+	gsl_matrix_view mv = gsl_matrix_view_array(MV, 4, 4);
+
+	double zeroes[] = { 	0.00, 0.00, 0.00, 0.00,
+							0.00, 0.00, 0.00, 0.00,
+							0.00, 0.00, 0.00, 0.00,
+							0.00, 0.00, 0.00, 0.00
+					  };
+
+	gsl_matrix_view C = gsl_matrix_view_array(zeroes, 4, 4);
+
+	gsl_blas_dgemm(	CblasNoTrans, CblasNoTrans,
+					1.0, &mv.matrix, &i.matrix,
+					0.0, &C.matrix
+				);
+
+
+
+	return gsl_matrix_get(&C.matrix, 3, 0) + 1.0*gsl_matrix_get(&C.matrix, 0, 0)/2.0;
+
+
+}
+
+double get_x_left(){
+
+	double MV[16];
+
+	glGetDoublev(GL_MODELVIEW_MATRIX, MV);
+
+	gsl_matrix_view mv = gsl_matrix_view_array(MV, 4, 4);
+
+	double zeroes[] = { 	0.00, 0.00, 0.00, 0.00,
+							0.00, 0.00, 0.00, 0.00,
+							0.00, 0.00, 0.00, 0.00,
+							0.00, 0.00, 0.00, 0.00
+					  };
+
+	gsl_matrix_view C = gsl_matrix_view_array(zeroes, 4, 4);
+
+	gsl_blas_dgemm(	CblasNoTrans, CblasNoTrans,
+					1.0, &mv.matrix, &i.matrix,
+					0.0, &C.matrix
+				);
+
+
+
+	return gsl_matrix_get(&C.matrix, 3, 0) - 1.0*gsl_matrix_get(&C.matrix, 0, 0)/2.0;
+
+
 }
