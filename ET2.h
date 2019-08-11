@@ -6,14 +6,23 @@
 #include <gsl/gsl_permutation.h>
 #include <gsl/gsl_linalg.h>
 
+typedef struct obstacle{
 
+	/*leva i desna granica prepreke po x 
+	 *zajedno definisu sirinu prepreke po x osi
+	 *kako bi se utvrdilo da li je igrac izbegao prepreku 
+	 *ili je doslo do kolizije.
+	 *z koordinata predstavlja z koordinatu centra prednje pljosni prepreke
+	 *sluzi da bi se utvrdilo da li je prepreka dovoljno prisla
+	 *igracu.
+	 *ukoliko su oba ova uslova ispunjena doslo je do kolizije i igra se prekida
+	 */ 
 
-typedef struct plane{
+	double z;     //z koordinata prepreke
+	double x_l;	  //leva granica prepreke po x
+	double x_r;   //desna granica prepreke po x
 
-	float begining;
-	float end;
-
-} PLANE;
+} OBSTACLE;
 
 
 void draw_axes();
@@ -26,6 +35,9 @@ void   save_V_inverse();
 double get_z();
 double get_x_left();
 double get_x_right();
+void   check_collision();
+
+
 
 
 

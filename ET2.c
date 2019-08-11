@@ -78,7 +78,7 @@ int main(int argc, char *argv[])
 	glClearColor(0, 0, 0, 0);
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_NORMALIZE);
-	
+
 	//glavna petlja
 	glutMainLoop();
 
@@ -263,10 +263,12 @@ static void on_timer(int value){
      *osaje u istom polozaju kada je pauzira igra,
      *odnosno ne ubrazava se kretanje staze kada je igra u toku
      */
-    if(value != 1){
+
+    if(value != TIMER1){
 		path_trans_1 += 0.002;
 		path_trans_2 += 0.002;
-	}
+
+	}	
 
 
 
@@ -275,7 +277,8 @@ static void on_timer(int value){
 
     /* Po potrebi se ponovo postavlja tajmer. */
     if (animation_ongoing)
-        glutTimerFunc(1, on_timer, TIMER0);
+   		glutTimerFunc(1, on_timer, TIMER0);
+    	
 }
 /*--------------------------------------------------------------*/
 //pozva se kad se promeni razmera prozora
@@ -291,13 +294,16 @@ static void on_display(void){
 	//cistimo buffere
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+
+	set_lights();
+
 	//
 	glViewport(0, 0, window_width, window_height);
 
 	//postaljamo projekciju
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
-	gluPerspective(60, window_width/window_height, 1, 1500);
+	gluPerspective(60, window_width/(float)window_height, 1, 1500);
 	
 
 	
@@ -337,9 +343,9 @@ static void on_display(void){
 
 
 
-	set_lights(); //pozivamo f-je za postavljanje osvetljenja i materijala
+	//set_lights(); //pozivamo f-je za postavljanje osvetljenja i materijala
 	
-	draw_axes(); //pozivamo f-ju za iscrtavanje koordinatnih osa
+	//draw_axes(); //pozivamo f-ju za iscrtavanje koordinatnih osa
 
 
 	/* x_trans je parametar koji se menja pritiskom 
